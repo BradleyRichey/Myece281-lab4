@@ -25,7 +25,13 @@ end top_basys3;
 architecture top_basys3_arch of top_basys3 is
 
     -- signal declarations
-    
+    signal w_data : std_logic_vector(3 downto 0);
+    signal w_clk : std_logic;
+    signal w_reset : std_logic;
+    signal w_e1floors : std_logic_vector(3 downto 0);
+    signal w_e2floors : std_logic_vector(3 downto 0);
+    signal w_mux_clk : std_logic;
+    signal w_to_clk2 : std_logic;
   
 	-- component declarations
     component sevenseg_decoder is
@@ -70,14 +76,69 @@ architecture top_basys3_arch of top_basys3 is
 	
 begin
 	-- PORT MAPS ----------------------------------------
-    	
+    svnseg_decoder: sevenseg_decoder
+    port map(
+        i_Hex => w_data,
+        o_seg_n => seg
+      );
+
+    elevator1: elevator_controller_fsm
+    port map(
+        i_clk => w_clk,
+        i_reset => w_reset,
+        is_stopped => sw(0),
+        go_up_down => sw(1),
+        o_floor => w_e1floors
+      );
+      
+    elevator2: elevator_controller_fsm
+    port map(
+        i_clk => w_clk,
+        i_reset => w_reset,
+        is_stopped => sw(14),
+        go_up_down => sw(15),
+        o_floor => w_e2floors
+      );
+      
+    mux: TDM4
+    port map(
+        i_clk => w_mux_clk,
+        i_reset => btnU,
+        i_D3 => x"F",
+        i_D2 => w_e2floors,
+        i_D1 => x"F",
+        i_D0 => w_e1floors,
+        o_data => w_data,
+        o_sel => an
+	);
+	
+	elevator_clk: clock_divider
+	generic map(k_DIV => 50000000)
+	port map(
+	   i_clk => clk,
+	   i_reset => w_to_clk2,
+	   o_clk => w_clk
+	 );
+	 
+	 mux_clk: clock_divider
+	 generic map(k_DIV => 9500)
+	 port map(
+	   i_clk => clk,
+	   i_reset => w_to_clk2,
+	   o_clk => w_mux_clk
+	 );
+	
 	
 	-- CONCURRENT STATEMENTS ----------------------------
 	
 	-- LED 15 gets the FSM slow clock signal. The rest are grounded.
+	led(15) <= w_clk;
+	led(14 downto 0) <= (others => '0');
 	
 	-- leave unused switches UNCONNECTED. Ignore any warnings this causes.
 	
 	-- reset signals
+	w_reset <= btnR or btnU;
+	w_mux_clk <= btnL or btnU;
 	
 end top_basys3_arch;
